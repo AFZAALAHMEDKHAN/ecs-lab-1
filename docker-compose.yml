@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: scaler-postgres
+    environment:
+      POSTGRES_USER: scaler_admin
+      POSTGRES_PASSWORD: VulnerablePassword123!
+      POSTGRES_DB: scaler_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - scaler-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scaler_admin -d scaler_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: scaler-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: scaler_admin
+      MONGO_INITDB_ROOT_PASSWORD: VulnerablePassword123!
+      MONGO_INITDB_DATABASE: scaler_community
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/init:/docker-entrypoint-initdb.d
+    networks:
+      - scaler-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: scaler-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - scaler-network
+
+  identity-service:
+    build:
+      context: ./identity-service
+      dockerfile: Dockerfile
+    container_name: scaler-identity
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/scaler_db
+      - SPRING_DATASOURCE_USERNAME=scaler_admin
+      - SPRING_DATASOURCE_PASSWORD=VulnerablePassword123!
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - JWT_SECRET=c2VjcmV0c2VjcmV0c2VjcmV0c2VjcmV0c2VjcmV0c2VjcmV0
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks:
+      - scaler-network
+
+  course-service:
+    build:
+      context: ./course-service
+      dockerfile: Dockerfile
+    container_name: scaler-course
+    environment:
+      - DATABASE_URL=postgresql://scaler_admin:VulnerablePassword123!@postgres:5432/scaler_db
+      - IDENTITY_SERVICE_URL=http://identity-service:8080
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - scaler-network
+
+  commerce-service:
+    build:
+      context: ./commerce-service
+      dockerfile: Dockerfile
+    container_name: scaler-commerce
+    environment:
+      - DATABASE_URL=postgresql://scaler_admin:VulnerablePassword123!@postgres:5432/scaler_db
+      - IDENTITY_SERVICE_URL=http://identity-service:8080
+      - COURSE_SERVICE_URL=http://course-service:8081
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - scaler-network
+
+  community-service:
+    build:
+      context: ./community-service
+      dockerfile: Dockerfile
+    container_name: scaler-community
+    environment:
+      - MONGO_URI=mongodb://scaler_admin:VulnerablePassword123!@mongodb:27017/scaler_community?authSource=admin
+      - IDENTITY_SERVICE_URL=http://identity-service:8080
+    ports:
+      - "8083:8083"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - scaler-network
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: scaler-web
+    ports:
+      - "9091:80"
+    depends_on:
+      - identity-service
+      - course-service
+      - commerce-service
+      - community-service
+    networks:
+      - scaler-network
+
+networks:
+  scaler-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:

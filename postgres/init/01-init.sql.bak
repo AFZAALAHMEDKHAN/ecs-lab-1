@@ -1,0 +1,84 @@
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'student',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS courses (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    instructor_id INTEGER REFERENCES users(id),
+    price DECIMAL(10,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS enrollments (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER REFERENCES users(id),
+    course_id INTEGER REFERENCES courses(id),
+    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'active'
+);
+
+CREATE TABLE IF NOT EXISTS assignments (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER REFERENCES courses(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    max_score INTEGER DEFAULT 100,
+    due_date TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS submissions (
+    id SERIAL PRIMARY KEY,
+    assignment_id INTEGER REFERENCES assignments(id),
+    student_id INTEGER REFERENCES users(id),
+    content TEXT,
+    score INTEGER,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    stock INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    total_amount DECIMAL(10,2),
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id),
+    product_id INTEGER REFERENCES products(id),
+    quantity INTEGER,
+    price DECIMAL(10,2)
+);
+
+INSERT INTO users (username, email, password, role) VALUES
+('admin', 'admin@scaler.com', 'admin123', 'admin'),
+('instructor1', 'instructor@scaler.com', 'instructor123', 'instructor'),
+('student1', 'student1@scaler.com', 'student123', 'student'),
+('student2', 'student2@scaler.com', 'student123', 'student');
+
+INSERT INTO courses (title, description, instructor_id, price) VALUES
+('API Security Fundamentals', 'Learn API security basics', 2, 99.99),
+('Advanced Penetration Testing', 'Master pentesting skills', 2, 199.99),
+('Web Application Security', 'Secure web applications', 2, 149.99);
+
+INSERT INTO products (name, description, price, stock) VALUES
+('Premium Membership', 'Access to all courses', 499.99, 999),
+('Certification Exam', 'Get certified', 99.99, 500),
+('Study Materials Bundle', 'Complete study pack', 29.99, 100);

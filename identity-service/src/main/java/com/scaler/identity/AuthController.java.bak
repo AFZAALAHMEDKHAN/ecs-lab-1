@@ -1,0 +1,192 @@
+package com.scaler.identity;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Base64;
+import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper; 
+import jakarta.mail.*; 
+import jakarta.mail.internet.InternetAddress; 
+import jakarta.mail.internet.MimeMessage;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@CrossOrigin(origins = "*")
+public class AuthController {
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+    
+    private Map<String, String> otpStore = new HashMap<>();
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        user.setRole("student");
+        User savedUser = userRepository.save(user);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "User registered successfully");
+        response.put("userId", savedUser.getId());
+        response.put("password", savedUser.getPassword());
+        return ResponseEntity.ok(response);
+    }
+    
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        String username = credentials.get("username");
+        String password = credentials.get("password");
+        
+        User user = userRepository.findByUsername(username);
+        
+        if (user != null && user.getPassword().equals(password)) {
+            String token = Jwts.builder()
+                .setSubject(user.getUsername())
+                .claim("role", user.getRole())
+                .claim("userId", user.getId())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
+                .signWith(SignatureAlgorithm.HS256, jwtSecret)
+                .compact();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("user", user);
+            return ResponseEntity.ok(response);
+        }
+        
+        return ResponseEntity.status(401).body("Invalid credentials");
+    }
+    
+    @GetMapping("/users/{id}")
+    public ResponseEntity<?> getUser(@PathVariable Long id) {
+        User user = userRepository.findById(id).orElse(null);
+        return ResponseEntity.ok(user);
+    }
+    
+    @PutMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User updatedUser) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user != null) {
+            user.setUsername(updatedUser.getUsername());
+            user.setEmail(updatedUser.getEmail());
+            user.setRole(updatedUser.getRole());
+            userRepository.save(user);
+            return ResponseEntity.ok(user);
+        }
+        return ResponseEntity.notFound().build();
+    }
+    
+    @GetMapping("/health")
+    public ResponseEntity<?> health() {
+        return ResponseEntity.ok("OK");
+    }
+    @GetMapping("/role")
+    public ResponseEntity<?> getRole(@RequestHeader("Authorization") String authHeader) {
+     try {
+	String token = authHeader.replace("Bearer ", "");
+
+	String[] parts = token.split("\\.");
+	if (parts.length != 3) {
+    		return ResponseEntity.status(400).body("Invalid JWT format");
+                }
+
+	// decode payload WITHOUT verifying signature
+	String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]));
+
+	ObjectMapper mapper = new ObjectMapper();
+	Map<String, Object> claims = mapper.readValue(payloadJson, Map.class);
+
+	String role = (String) claims.get("role");
+	String username = (String) claims.get("sub");
+
+	Map<String, Object> response = new HashMap<>();
+	response.put("role", role);
+	response.put("username", username);
+	return ResponseEntity.ok(response);
+        
+       } catch (Exception e) {
+             return ResponseEntity.status(401).body("Invalid token");
+        }
+      }	
+        @PostMapping("/forgot-password")
+    	public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String username = body.get("username");
+
+        User user = userRepository.findByUsername(username);
+          if (user == null) {
+            return ResponseEntity.status(404).body("User not found");
+            }
+
+        // Weak predictable OTP (intentional vulnerability)
+        String otp = String.valueOf((int)(Math.random() * 9000) + 1000);
+
+        otpStore.put(username, otp);
+
+        sendEmail(
+                user.getEmail(),
+                "Your OTP Code",
+                "Your OTP is: " + otp
+          );
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "OTP sent to registered email");
+        return ResponseEntity.ok(response);
+        }
+	@PostMapping("/reset-password")
+    	public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String username = body.get("username");
+        String otp = body.get("otp");
+        String newPassword = body.get("newPassword");
+
+          //if (!otpStore.containsKey(username) || !otpStore.get(username).equals(otp)) {
+            if (!otpStore.containsValue(otp)) {
+			return ResponseEntity.status(400).body("Invalid OTP");
+             }
+
+        User user = userRepository.findByUsername(username);
+            if (user == null) {
+               return ResponseEntity.status(404).body("User not found");
+           }
+
+        // 🔥 Vulnerability: attacker can reset ANY user's password
+        user.setPassword(newPassword);
+        userRepository.save(user);
+
+        otpStore.remove(username);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Password reset successful");
+        return ResponseEntity.ok(response);
+     }
+
+
+ 	private void sendEmail(String to, String subject, String body) {
+        try {
+            Properties props = new Properties();
+            props.put("mail.smtp.host", "mailhog"); // hostname from docker-compose
+            props.put("mail.smtp.port", "1025");
+
+            Session session = Session.getInstance(props, null);
+
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress("no-reply@scaler.com"));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            message.setSubject(subject);
+            message.setText(body);
+
+            Transport.send(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }	
+
+  }
+}

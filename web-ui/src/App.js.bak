@@ -1,0 +1,165 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import axios from 'axios';
+import './index.css';
+
+function App() {
+  return (
+    <Router>
+      <div className="App">
+        <Navigation />
+        <div className="container">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/courses" element={<Courses />} />
+            <Route path="/shop" element={<Shop />} />
+            <Route path="/forums" element={<Forums />} />
+          </Routes>
+        </div>
+      </div>
+    </Router>
+  );
+}
+
+function Navigation() {
+  return (
+    <nav className="nav">
+      <img src="/logo.png" alt="Scaler Logo" className="logo" />
+      <ul>
+        <li><Link to="/">Home</Link></li>
+        <li><Link to="/courses">Courses</Link></li>
+        <li><Link to="/shop">Shop</Link></li>
+        <li><Link to="/forums">Forums</Link></li>
+        <li><Link to="/login">Login</Link></li>
+      </ul>
+    </nav>
+  );
+}
+
+function Home() {
+  return (
+    <div>
+      <div className="hero">
+        <h1>Welcome to Scaler Vulnersity</h1>
+        <p>Learn API Security Through Hands-On Practice</p>
+      </div>
+      <div className="card">
+        <h2>About This Platform</h2>
+        <p>⚠️ This is an intentionally vulnerable application for educational purposes</p>
+      </div>
+    </div>
+  );
+}
+
+function Login() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('/api/v1/auth/login', {
+        username,
+        password
+      });
+      alert('Login successful!');
+    } catch (error) {
+      alert('Login failed');
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2>Login</h2>
+      <form onSubmit={handleLogin}>
+        <input
+          type="text"
+          className="input"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <input
+          type="password"
+          className="input"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button type="submit" className="btn">Login</button>
+      </form>
+      <p>Try: student1 / student123</p>
+    </div>
+  );
+}
+
+function Courses() {
+  const [courses, setCourses] = useState([]);
+
+  useEffect(() => {
+    axios.get('/api/v1/courses')
+      .then(res => setCourses(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
+  return (
+    <div>
+      <h2 style={{color: 'white'}}>Available Courses</h2>
+      {courses.map(course => (
+        <div key={course.id} className="card">
+          <h3>{course.title}</h3>
+          <p>{course.description}</p>
+          <p><strong>Price: ${course.price}</strong></p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Shop() {
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    axios.get('/api/v1/products')
+      .then(res => setProducts(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
+  return (
+    <div>
+      <h2 style={{color: 'white'}}>Shop</h2>
+      {products.map(product => (
+        <div key={product.id} className="card">
+          <h3>{product.name}</h3>
+          <p>{product.description}</p>
+          <p><strong>${product.price}</strong></p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Forums() {
+  const [forums, setForums] = useState([]);
+
+  useEffect(() => {
+    axios.get('/api/v1/forums')
+      .then(res => setForums(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
+  return (
+    <div>
+      <h2 style={{color: 'white'}}>Community Forums</h2>
+      {forums.map(forum => (
+        <div key={forum.id} className="card">
+          <h3>{forum.title}</h3>
+          <p>{forum.description}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default App;
