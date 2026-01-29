@@ -1,0 +1,6 @@
+docker build -t scaler-lab-identity ./identity-service
+docker build -t scaler-lab-course ./course-service
+docker build -t scaler-lab-commerce ./commerce-service
+docker build -t scaler-lab-community ./community-service
+docker build -t scaler-lab-web ./web-ui
+
