@@ -1,20 +1,2 @@
-# Dependencies
-node_modules/
-target/
-*.class
-
-# Build outputs
-build/
-dist/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker
-.env
+aws
+awscliv2.zip
